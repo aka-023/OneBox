@@ -14,23 +14,28 @@ type EmailDetail = {
 };
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const messageId = params.id;
+  // Await params as required by Next.js
+  const { id: messageId } = await context.params;
 
-  // 1. Verify session & load linked accounts
+  // 1. Verify session
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // 2. Connect to DB
   await connectToDatabase();
   const accounts = await LinkedAccount.find({ userId: session.user.id });
 
-  // 2. Try each account until we find the message
+  // 3. Try each account until message found
   for (const acct of accounts) {
-    const oauth2Client = new google.auth.OAuth2();
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
     oauth2Client.setCredentials({
       access_token: acct.accessToken,
       refresh_token: acct.refreshToken,
@@ -49,7 +54,7 @@ export async function GET(
         headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
       const from = headers.find((h) => h.name === "From")?.value || "Unknown";
 
-      // Extract body (HTML or plain text)
+      // Extract body
       const getBody = (payload: any): string => {
         if (payload.parts) {
           for (const part of payload.parts) {
@@ -74,15 +79,9 @@ export async function GET(
 
       const body = getBody(res.data.payload);
 
-      const detail: EmailDetail = {
-        accountEmail: acct.email,
-        subject,
-        from,
-        body,
-      };
+      const detail: EmailDetail = { accountEmail: acct.email, subject, from, body };
       return NextResponse.json(detail);
     } catch (e: any) {
-      // if not found in this account, continue to next
       if (e.code === 404) continue;
       console.error("Error fetching message:", e);
     }
