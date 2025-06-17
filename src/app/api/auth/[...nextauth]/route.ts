@@ -1,13 +1,16 @@
+// src/app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { NextAuthOptions } from "next-auth";
+import { connectToDatabase } from "../../../lib/mongodb";
+import { LinkedAccount } from "../../../models/linkedAccount";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-       authorization: {
+      authorization: {
         params: {
           scope:
             "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
@@ -19,15 +22,39 @@ export const authOptions: NextAuthOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       if (account) {
         token.accessToken = account.access_token;
+        token.userId = user?.id;
       }
       return token;
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken;
+      session.user.id = token.userId as string;
       return session;
+    },
+  },
+  events: {
+    async signIn({ user, account }) {
+      if (account && account.provider === 'google') {
+        // On initial Google sign-in, save the connected account
+        await connectToDatabase();
+        const email = user.email as string;
+        const accessToken = account.access_token as string;
+        const refreshToken = account.refresh_token as string;
+        const expiresAt =
+          account.expires_at && typeof account.expires_at === 'number'
+            ? account.expires_at * 1000
+            : Date.now() + 3600 * 1000;
+
+        // Upsert linked account
+        await LinkedAccount.findOneAndUpdate(
+          { userId: user.id as string, email },
+          { provider: 'google', accessToken, refreshToken, expiresAt },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
     },
   },
 };

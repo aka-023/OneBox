@@ -1,12 +1,14 @@
-//src/app/dashboard/compose/page.tsx
+// src/app/dashboard/compose/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ComposeEmailPage() {
   const router = useRouter();
+  const [accounts, setAccounts] = useState<{ email: string }[]>([]);
   const [formData, setFormData] = useState({
+    from: "",
     to: "",
     subject: "",
     message: "",
@@ -14,7 +16,24 @@ export default function ComposeEmailPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Load linked accounts to choose 'from'
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((res) => res.json())
+      .then((data: { email: string }[]) => {
+        setAccounts(data);
+        if (data.length) {
+          setFormData((prev) => ({ ...prev, from: data[0].email }));
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -34,7 +53,8 @@ export default function ComposeEmailPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to send email.");
+        const data = await res.json();
+        throw new Error(data.error || "Failed to send email.");
       }
 
       router.push("/dashboard");
@@ -51,6 +71,22 @@ export default function ComposeEmailPage() {
         <h1 className="text-2xl font-bold mb-4">Compose Email</h1>
         {error && <p className="text-red-600 mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block font-medium mb-1">From</label>
+            <select
+              name="from"
+              value={formData.from}
+              onChange={handleChange}
+              required
+              className="w-full border border-gray-300 rounded-md px-4 py-2"
+            >
+              {accounts.map((acct) => (
+                <option key={acct.email} value={acct.email}>
+                  {acct.email}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block font-medium mb-1">To</label>
             <input

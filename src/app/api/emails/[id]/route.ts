@@ -1,63 +1,95 @@
+// src/app/api/emails/[id]/route.ts
+import { NextResponse } from "next/server";
 import { google } from "googleapis";
-import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/route"
-import { OAuth2Client } from "google-auth-library";
+import { authOptions } from "../../auth/[...nextauth]/route";
+import { connectToDatabase } from "../../../lib/mongodb";
+import { LinkedAccount } from "../../../models/linkedAccount";
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+type EmailDetail = {
+  accountEmail: string;
+  subject: string;
+  from: string;
+  body: string;
+};
+
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  const messageId = params.id;
+
+  // 1. Verify session & load linked accounts
   const session = await getServerSession(authOptions);
-
-  if (!session || !session.accessToken) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = context.params;
+  await connectToDatabase();
+  const accounts = await LinkedAccount.find({ userId: session.user.id });
 
-  const oauth2Client = new OAuth2Client();
-  oauth2Client.setCredentials({
-    access_token: session.accessToken as string,
-  });
-
-  const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-
-  try {
-    const res = await gmail.users.messages.get({
-      userId: "me",
-      id,
-      format: "full",
+  // 2. Try each account until we find the message
+  for (const acct of accounts) {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({
+      access_token: acct.accessToken,
+      refresh_token: acct.refreshToken,
     });
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const payload = res.data.payload;
-    const headers = payload?.headers || [];
+    try {
+      const res = await gmail.users.messages.get({
+        userId: "me",
+        id: messageId,
+        format: "full",
+      });
 
-    const subject = headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
-    const from = headers.find((h) => h.name === "From")?.value || "Unknown";
+      const headers = res.data.payload?.headers || [];
+      const subject =
+        headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
+      const from = headers.find((h) => h.name === "From")?.value || "Unknown";
 
-    // Extract HTML or plain text body
-    const getBody = (payload: any): string => {
-      if (payload.parts) {
-        for (const part of payload.parts) {
-          if (part.mimeType === "text/html") {
-            return Buffer.from(part.body.data, "base64").toString("utf-8");
+      // Extract body (HTML or plain text)
+      const getBody = (payload: any): string => {
+        if (payload.parts) {
+          for (const part of payload.parts) {
+            if (part.mimeType === "text/html") {
+              return Buffer.from(part.body.data, "base64").toString("utf-8");
+            }
+          }
+          for (const part of payload.parts) {
+            if (part.mimeType === "text/plain") {
+              return `<pre>${Buffer.from(
+                part.body.data,
+                "base64"
+              ).toString("utf-8")}</pre>`;
+            }
           }
         }
-        for (const part of payload.parts) {
-          if (part.mimeType === "text/plain") {
-            return `<pre>${Buffer.from(part.body.data, "base64").toString("utf-8")}</pre>`;
-          }
+        if (payload.body?.data) {
+          return Buffer.from(payload.body.data, "base64").toString("utf-8");
         }
-      }
-      if (payload.body?.data) {
-        return Buffer.from(payload.body.data, "base64").toString("utf-8");
-      }
-      return "No content found.";
-    };
+        return "No content found.";
+      };
 
-    const body = getBody(payload);
+      const body = getBody(res.data.payload);
 
-    return NextResponse.json({ subject, from, body });
-  } catch (error) {
-    console.error("Failed to fetch email:", error);
-    return NextResponse.json({ error: "Failed to fetch email" }, { status: 500 });
+      const detail: EmailDetail = {
+        accountEmail: acct.email,
+        subject,
+        from,
+        body,
+      };
+      return NextResponse.json(detail);
+    } catch (e: any) {
+      // if not found in this account, continue to next
+      if (e.code === 404) continue;
+      console.error("Error fetching message:", e);
+    }
   }
+
+  return NextResponse.json(
+    { error: "Email not found in any linked account" },
+    { status: 404 }
+  );
 }

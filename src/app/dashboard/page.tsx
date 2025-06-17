@@ -1,50 +1,65 @@
+//src/app/dashboard/page.tsx
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import EmailList, { Email } from "../components/EmailList";
 import Link from "next/link";
 
-type Email = {
-  id: string;
-  subject: string;
-  snippet: string;
+type Account = {
+  _id: string;
+  email: string;
 };
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [emails, setEmails] = useState<Email[]>([]);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
+  const linkAccount = async () => {
+    try {
+      const res = await fetch("/api/accounts/oauth-url");
+      const { url } = await res.json();
+      // Redirect the browser to Google’s consent screen
+      window.location.href = url;
+    } catch (err) {
+      console.error("Failed to start link flow", err);
     }
+  };
+
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
+  // Load linked accounts
   useEffect(() => {
-    const fetchEmails = async () => {
-      try {
-        const res = await fetch("/api/emails", {
-          headers: {
-            Authorization: `Bearer ${session?.accessToken}`,
-          },
-        });
-        const data = await res.json();
-        setEmails(data);
-      } catch (err) {
-        console.error("Failed to fetch emails", err);
-      }
-    };
-
-    if (session?.accessToken) {
-      fetchEmails();
-    }
+    if (!session?.user?.id) return;
+    fetch("/api/accounts")
+      .then((res) => res.json())
+      .then((data: Account[]) => {
+        setAccounts(data);
+        if (data.length) setSelectedAccount(data[0]);
+      });
   }, [session]);
 
-  if (status === "loading") {
-    return <div className="text-center p-10">Loading...</div>;
-  }
+  // Fetch emails for the selected account
+  useEffect(() => {
+    if (!selectedAccount || !session?.accessToken) return;
+    fetch(`/api/emails?account=${selectedAccount.email}`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    })
+      .then((res) => res.json())
+      .then(setEmails)
+      .catch(console.error);
+  }, [selectedAccount, session]);
+
+  if (status === "loading") return <div className="text-center p-10">Loading...</div>;
 
   return (
     <div className="flex min-h-screen">
@@ -58,10 +73,16 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/dashboard/compose"
-            className="inline-block bg-white text-indigo-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-100 transition"
+            className="block bg-white text-indigo-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-100 transition mb-2"
           >
             + Compose
           </Link>
+          <button
+          onClick={linkAccount}
+          className="block bg-white text-indigo-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-100 transition"
+        >
+          + Add Account
+        </button>
         </div>
         <button
           onClick={() => signOut()}
@@ -73,22 +94,27 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <div className="flex-1 bg-gray-100 p-10">
-        <h2 className="text-2xl font-semibold mb-6">Inbox</h2>
+        <h2 className="text-2xl font-semibold mb-4">Inbox</h2>
 
-        {emails.length === 0 ? (
-          <p className="text-gray-600">No emails found or loading...</p>
-        ) : (
-          <ul className="space-y-4">
-            {emails.map((email) => (
-              <Link key={email.id} href={`/dashboard/email/${email.id}`}>
-                <li className="bg-white p-4 rounded-lg shadow hover:shadow-md transition cursor-pointer">
-                  <h3 className="font-semibold text-lg text-gray-800">{email.subject}</h3>
-                  <p className="text-gray-600 text-sm">{email.snippet}</p>
-                </li>
-              </Link>
-            ))}
-          </ul>
-        )}
+        {/* Account Tabs */}
+        <div className="mb-6 flex space-x-4">
+          {accounts.map((acct) => (
+            <button
+              key={acct._id}
+              onClick={() => setSelectedAccount(acct)}
+              className={`px-4 py-2 rounded-md font-medium ${
+                selectedAccount?.email === acct.email
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-indigo-700"
+              }`}
+            >
+              {acct.email}
+            </button>
+          ))}
+        </div>
+
+        {/* Email List */}
+        <EmailList emails={emails} />
       </div>
     </div>
   );

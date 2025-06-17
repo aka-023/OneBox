@@ -1,13 +1,23 @@
-import NextAuth from "next-auth";
+// src/types/next-auth.d.ts
+import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
 
 declare module "next-auth" {
-  interface Session {
+  /**
+   * Returned by `useSession`, `getServerSession`, etc.
+   */
+  interface Session extends DefaultSession {
     accessToken?: string;
-    refreshToken?: string;
+    // override the `user` property to include `id`
+    user: DefaultSession["user"] & {
+      id: string;
+    };
   }
 
-  interface User {
-    // Optional: If you want to add custom user fields
+  /**
+   * The `User` object from next-auth callbacks
+   */
+  interface User extends DefaultUser {
+    id: string;
   }
 }
 
@@ -15,5 +25,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     accessToken?: string;
     refreshToken?: string;
+    userId?: string;
   }
 }
