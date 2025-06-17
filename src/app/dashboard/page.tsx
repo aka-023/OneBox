@@ -131,12 +131,12 @@ export default function DashboardPage() {
           </Breadcrumb>
         </header>
 
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 bg-[url('/bg.jpg')]">
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
-              <h1 className="text-3xl font-bold tracking-tight">Inbox</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Inbox</h1>
               {selectedAccount && (
-                <p className="text-muted-foreground mt-1">
+                <p className="mt-1 text-amber-50">
                   Showing latest emails from {selectedAccount.email}
                 </p>
               )}

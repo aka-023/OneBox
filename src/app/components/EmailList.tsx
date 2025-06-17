@@ -50,11 +50,11 @@ export default function EmailList({ emails, loading = false }: EmailListProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {emails.map((email) => (
         <Link key={email.id} href={`/dashboard/email/${email.id}`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer m-2">
+            <CardContent className="p-3">
               <h3 className="font-semibold text-lg text-foreground mb-1 line-clamp-1">
                 {email.subject || "(No Subject)"}
               </h3>
