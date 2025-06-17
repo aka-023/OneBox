@@ -1,4 +1,5 @@
 // src/app/api/accounts/route.ts
+//fetches the accounts linked to an account
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { connectToDatabase } from "../../lib/mongodb";

@@ -1,10 +1,12 @@
 // src/app/api/send/route.ts
+//send email to an account
 import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { connectToDatabase } from "../../lib/mongodb";
 import { LinkedAccount } from "../../models/linkedAccount";
+import { OAuth2Client } from "google-auth-library";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -24,12 +26,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid from address" }, { status: 400 });
   }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+  
   oauth2Client.setCredentials({
     access_token: acct.accessToken,
     refresh_token: acct.refreshToken,
   });
 
+  const { token: freshAccessToken, res } = await oauth2Client.getAccessToken();
+
+  // Update DB if the token changed or expiry updated:
+  if (freshAccessToken && freshAccessToken !== acct.accessToken) {
+    const newExpiry = res?.data?.expiry_date ?? Date.now() + 3600e3;
+    await LinkedAccount.updateOne(
+      { _id: acct._id },
+      { accessToken: freshAccessToken, expiresAt: newExpiry }
+    );
+    oauth2Client.setCredentials({ access_token: freshAccessToken });
+  }
+
+// Now safe to call Gmail:
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
   // Build raw message with proper From header
@@ -50,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await gmail.users.messages.send({
-      userId: "me",
+      userId: from,
       requestBody: { raw: encodedMessage },
     });
     return NextResponse.json({ success: true });

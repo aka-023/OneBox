@@ -1,4 +1,5 @@
 // src/app/api/emails/route.ts
+//fetch email lists
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getServerSession } from "next-auth/next";

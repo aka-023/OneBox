@@ -7,6 +7,7 @@ declare module "next-auth" {
    */
   interface Session extends DefaultSession {
     accessToken?: string;
+    refreshToken?: string;
     // override the `user` property to include `id`
     user: DefaultSession["user"] & {
       id: string;

@@ -1,4 +1,6 @@
 // src/app/api/auth/[...nextauth]/route.ts
+//maintains oAuth2
+
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { NextAuthOptions } from "next-auth";
@@ -25,12 +27,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, user }) {
       if (account) {
         token.accessToken = account.access_token;
+         if (account.refresh_token) {
+          token.refreshToken = account.refresh_token;
+         }
         token.userId = user?.id;
       }
       return token;
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken;
+      session.refreshToken = token.refreshToken;
       session.user.id = token.userId as string;
       return session;
     },
