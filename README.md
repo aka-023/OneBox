@@ -1,15 +1,12 @@
-# OneBox
+# OneBox 🗳️
 
 **OneBox** lets you connect multiple Gmail accounts in one place, read emails, and send replies—all from a single, beautiful interface! 🚀
 
 ---
 
-## 🚀 Features
+## ❤️ Features
 
-- **Unified Inbox:** 
-- **Easy Account Linking:** 
-- **Auto‑Refresh Tokens:** 
-- **Compose & Send:** 
+- **Unified Inbox ,** **Easy Account Linking ,** **Auto‑Refresh Tokens ,** **Compose & Send** 
 
 ---
 
@@ -51,13 +48,43 @@ During my intern season, I missed important emails because my messages were scat
    MONGODB_URI=<your-mongodb-connection-string>
    ```
 
-4. **Run the development server**  
+4. **Google Cloud Setup**  
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project
+   - Select the project and go to **APIs & Services → Credentials**
+   - Create OAuth 2.0 Client Credentials
+   - Add the following **Authorized Redirect URIs**:
+     - `http://localhost:3000/api/auth/callback`
+     - `http://localhost:3000/api/auth/callback/google`
+     - `http://localhost:3000/api/accounts/oauth-callback`
+   - Add the following **Authorized JavaScript Origins**:
+     - `http://localhost:3000`
+   - Under **OAuth consent screen**, add test users you want to allow login
+   - Add required scopes:
+     - `https://www.googleapis.com/auth/gmail.readonly`
+     - `https://www.googleapis.com/auth/gmail.send`
+     - `openid`, `email`, `profile`
+
+5. **Run the development server**  
    ```bash
    npm run dev
    ```
 
-5. **Open in your browser**  
+6. **Open in your browser**  
    Navigate to [http://localhost:3000](http://localhost:3000) and connect your Gmail account!
+
+---
+
+## 📸 Screenshots
+
+![Login Page](../my-app/public/login.png)  
+*Modern and inviting login screen*
+
+![Dashboard](../my-app/public/dashboard.png)  
+*Unified inbox with account tabs and compose button*
+
+![Compose Email](../my-app/public/compose.png)  
+*Select “From” account and send email seamlessly*
 
 ---
 
