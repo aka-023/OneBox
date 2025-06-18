@@ -77,14 +77,11 @@ During my intern season, I missed important emails because my messages were scat
 
 ## 📸 Screenshots
 
-![Login Page](../my-app/public/login.png)  
-*Modern and inviting login screen*
+![login](https://github.com/user-attachments/assets/fa29f888-f917-478d-8390-417a5854eb07)
 
-![Dashboard](../my-app/public/dashboard.png)  
-*Unified inbox with account tabs and compose button*
+![dashboard](https://github.com/user-attachments/assets/fbb6ade1-6809-4ebf-be61-d419481c1a2d)
 
-![Compose Email](../my-app/public/compose.png)  
-*Select “From” account and send email seamlessly*
+![compose](https://github.com/user-attachments/assets/a1693875-0072-497b-8543-56043ef05745)
 
 ---
 
